@@ -3,11 +3,13 @@ import type { FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth, useClerk, useUser } from '@clerk/react'
 
-import { requestWhatsappVerification } from '../lib/api'
+import {
+  getUserWhatsappVerification,
+  requestWhatsappVerification,
+} from '../lib/api'
 import { Loading } from '../components/Loading'
 import {
   clearStoredPhone,
-  getStoredPhone,
   isVerified,
   setVerified,
   storePhone,
@@ -70,7 +72,6 @@ export default function OnboardingPage() {
 
         if (tag === 'Unauthenticated' || tag === 'MalformedJWT') {
           await clerk.signOut()
-          navigate('/sign-in', { replace: true })
           return
         }
 
@@ -81,8 +82,29 @@ export default function OnboardingPage() {
         setStage('form')
       }
     },
-    [clerk, finish, getToken, navigate],
+    [clerk, finish, getToken],
   )
+
+  const checkVerified = useCallback(async () => {
+    try {
+      const token = await getToken()
+      const { body } = await getUserWhatsappVerification(token)
+
+      if (body._tag === 'ok' && body.value.whatsappVerified) {
+        finish()
+        return
+      }
+
+      if (
+        body._tag === 'err' &&
+        (body.error._tag === 'Unauthenticated' || body.error._tag === 'MalformedJWT')
+      ) {
+        await clerk.signOut()
+      }
+    } catch {
+      // Offline or server down: stay on the form, the user can still submit.
+    }
+  }, [clerk, finish, getToken])
 
   useEffect(() => {
     if (autoChecked.current) {
@@ -90,16 +112,13 @@ export default function OnboardingPage() {
     }
     autoChecked.current = true
 
-    // A single check on load is what makes "refresh the page and you are done" work.
-    // Deliberately no polling: every POST re-sends the WhatsApp message when the
-    // user has not replied yet, so the user drives the checks instead.
-    const stored = getStoredPhone()
-    if (stored && !isVerified()) {
-      // Deferred by a tick so the mount effect performs no synchronous state update;
-      // the busy indicator appears when the check actually starts.
-      void Promise.resolve().then(() => checkPhone(stored, 'Checking WhatsApp verification…'))
+    // A single status check on load is what makes "refresh the page and you are
+    // done" work. It is a GET, so it never sends a WhatsApp message — no polling
+    // needed, and no risk of spamming the user's phone.
+    if (!isVerified()) {
+      void Promise.resolve().then(() => checkVerified())
     }
-  }, [checkPhone])
+  }, [checkVerified])
 
   if (!isLoaded) {
     return <Loading />
@@ -201,7 +220,7 @@ export default function OnboardingPage() {
 
             <button
               type="button"
-              onClick={() => void checkPhone(pendingPhone, 'Checking…')}
+              onClick={() => void checkVerified()}
               className="w-full rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
             >
               I replied — verify now

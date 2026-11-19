@@ -117,3 +117,17 @@ export const listTransactions = (token: string | null, query: ListTransactionsRe
     query,
     token,
   })
+
+/**
+ * GET /auth/whatsapp-verification
+ *
+ * Live check of the user's verification status straight from the database.
+ * Unlike the POST below, this has no side effects — it never sends a WhatsApp
+ * message — so it is safe to call on every dashboard mount. It replaces the
+ * cached sessionStorage flag that used to gate /dashboard.
+ */
+export const getUserWhatsappVerification = (token: string | null) =>
+  callApi('/auth/whatsapp-verification', {
+    method: 'GET',
+    token,
+  })
