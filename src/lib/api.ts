@@ -35,7 +35,7 @@ function encodeQuery(input: Record<string, unknown>): string {
       return
     }
     if (Array.isArray(value)) {
-      value.forEach((item) => walk(prefix, item))
+      value.forEach((item) => walk(`${prefix}[]`, item))
       return
     }
     if (value instanceof Date) {
