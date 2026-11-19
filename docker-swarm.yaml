@@ -1,0 +1,30 @@
+services:
+  cashbook:
+    image: localhost/whatsapp-cashbook-front
+    networks:
+      - public
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      resources:
+        limits:
+          cpus: '0.2'
+      labels:
+        # traefik config
+        - 'traefik.enable=true'
+
+        # api
+        - "traefik.http.routers.${DOCKER_STACK_NAME}_whatsapp-cashbook.rule=Host(`$HOST`)"
+        - "traefik.http.routers.${DOCKER_STACK_NAME}_whatsapp-cashbook.entrypoints=websecure"
+        - "traefik.http.routers.${DOCKER_STACK_NAME}_whatsapp-cashbook.tls=true"
+        - "traefik.http.routers.${DOCKER_STACK_NAME}_whatsapp-cashbook.tls.certresolver=leresolver"
+        - "traefik.http.routers.${DOCKER_STACK_NAME}_whatsapp-cashbook.tls.domains.main=$HOST"
+        - "traefik.http.routers.${DOCKER_STACK_NAME}_whatsapp-cashbook.service=${DOCKER_STACK_NAME}_whatsapp-cashbook"
+        - "traefik.http.services.${DOCKER_STACK_NAME}_whatsapp-cashbook.loadbalancer.server.port=${PORT}"
+
+networks:
+  public:
+    external: true
+    name: ${PUBLIC_NETWORK}
